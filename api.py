@@ -17,7 +17,6 @@ HEADERS = {
 }
 
 def get_soup(url, params=None):
-    # Dodajemy autoryzację do każdego wywołania, żeby nas nie wywaliło
     response = requests.get(
         url, 
         params=params, 
@@ -41,7 +40,6 @@ def get_all_groups():
         category_links = []
         for a in soup.find_all('a', href=True):
             if 'typ=G' in a['href'] and 'grupa=' in a['href']:
-                # Łączymy bazowy adres z końcówką linku
                 full_cat_url = urlparse.urljoin(BASE_URL, a['href'])
                 category_links.append(full_cat_url)
 
@@ -53,7 +51,6 @@ def get_all_groups():
             for a in cat_soup.find_all('a', href=True):
                 href = a['href']
                 if 'id=' in href and 'typ=G' in href:
-                    # Tutaj też łączymy adresy dla pewności
                     full_group_url = urlparse.urljoin(BASE_URL, href)
                     parsed = urlparse.urlparse(full_group_url)
                     group_id = urlparse.parse_qs(parsed.query).get('id', [None])[0]

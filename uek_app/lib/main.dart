@@ -50,10 +50,13 @@ class SetupScreen extends StatefulWidget {
 class _SetupScreenState extends State<SetupScreen> {
   List<dynamic> deanGroups = [];
   List<dynamic> langGroups = [];
+  List<dynamic> wfGroups = [];
+  
   String? selectedDeanId;
   String? selectedDeanName;
-  List<String> selectedLangs = [];
-  final wfController = TextEditingController();
+  List<dynamic> selectedLangs = [];
+  dynamic selectedWf; // Obiekt WF z ID
+  
   bool isLoading = false;
 
   @override
@@ -73,7 +76,13 @@ class _SetupScreenState extends State<SetupScreen> {
             final n = g['name'].toString().toUpperCase();
             return !n.startsWith("CJ") && !n.contains("WF") && !n.contains("AZS");
           }).toList();
+          
           langGroups = all.where((g) => g['name'].toString().toUpperCase().startsWith("CJ")).toList();
+          
+          wfGroups = all.where((g) {
+            final n = g['name'].toString().toUpperCase();
+            return n.contains("WF") || n.contains("AZS") || n.contains("SWFIS");
+          }).toList();
         });
       }
     } catch (e) {
@@ -87,8 +96,14 @@ class _SetupScreenState extends State<SetupScreen> {
     if (selectedDeanId == null) return;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('group_id', selectedDeanId!);
-    await prefs.setString('lang_group', selectedLangs.join(','));
-    await prefs.setString('wf_group', wfController.text.trim().toUpperCase());
+    await prefs.setString('lang_groups_json', json.encode(selectedLangs));
+    
+    if (selectedWf != null) {
+      await prefs.setString('wf_group_json', json.encode(selectedWf));
+    } else {
+      await prefs.remove('wf_group_json');
+    }
+    
     if (!mounted) return;
     Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (context) => const PlanScreen()));
   }
@@ -109,14 +124,18 @@ class _SetupScreenState extends State<SetupScreen> {
             ),
             const SizedBox(height: 15),
             ListTile(
-              title: Text(selectedLangs.isEmpty ? "Wybierz lektoraty (np. S11)" : "Wybrane: ${selectedLangs.join(', ')}"),
-              subtitle: const Text("Zaznacz grupy z listy"),
+              title: Text(selectedLangs.isEmpty ? "Wybierz lektoraty" : "Wybrane: ${selectedLangs.map((e) => e['name']).join(', ')}"),
               tileColor: Colors.grey[200],
               trailing: const Icon(Icons.language),
               onTap: () => _showLangPicker(),
             ),
             const SizedBox(height: 15),
-            TextField(controller: wfController, decoration: const InputDecoration(labelText: "Grupa WF (np. GR. 4)", border: OutlineInputBorder())),
+            ListTile(
+              title: Text(selectedWf != null ? "WF: ${selectedWf['name']}" : "Wybierz grupę WF / AZS"),
+              tileColor: Colors.grey[200],
+              trailing: const Icon(Icons.sports_basketball),
+              onTap: () => _showWfPicker(),
+            ),
             const SizedBox(height: 25),
             ElevatedButton(onPressed: _save, child: const Text("Zapisz i przejdź do planu"))
           ],
@@ -166,13 +185,13 @@ class _SetupScreenState extends State<SetupScreen> {
                   initialList: langGroups,
                   itemBuilder: (item) => CheckboxListTile(
                     title: Text(item['name']),
-                    value: selectedLangs.contains(item['name']),
+                    value: selectedLangs.any((e) => e['id'] == item['id']),
                     onChanged: (val) {
                       setModalState(() {
                         if (val == true) {
-                          selectedLangs.add(item['name']);
+                          selectedLangs.add(item);
                         } else {
-                          selectedLangs.remove(item['name']);
+                          selectedLangs.removeWhere((e) => e['id'] == item['id']);
                         }
                       });
                       setState(() {});
@@ -183,6 +202,44 @@ class _SetupScreenState extends State<SetupScreen> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  _showWfPicker() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.8,
+        padding: const EdgeInsets.all(10),
+        child: Column(
+          children: [
+            const Padding(padding: EdgeInsets.all(10), child: Text("Wybierz grupę WF / AZS", style: TextStyle(fontWeight: FontWeight.bold))),
+            Expanded(
+              child: SearchableList<dynamic>(
+                initialList: wfGroups,
+                itemBuilder: (item) => ListTile(
+                  title: Text(item['name']),
+                  onTap: () {
+                    setState(() {
+                      selectedWf = item;
+                    });
+                    Navigator.pop(context);
+                  },
+                ),
+                filter: (value) => wfGroups.where((e) => e['name'].toLowerCase().contains(value.toLowerCase())).toList(),
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                setState(() => selectedWf = null);
+                Navigator.pop(context);
+              },
+              child: const Text("Brak WF-u (Wyczyść)"),
+            )
+          ],
         ),
       ),
     );
@@ -209,42 +266,68 @@ class _PlanScreenState extends State<PlanScreen> {
   loadPlan() async {
     if (!mounted) return;
     setState(() => loading = true);
+    
     final prefs = await SharedPreferences.getInstance();
-    final id = prefs.getString('group_id');
-    final langRaw = prefs.getString('lang_group') ?? "";
-    final List<String> myLangCodes = langRaw.split(',').where((s) => s.isNotEmpty).map((s) => s.split(' ').last.toUpperCase()).toList();
-    final myWf = (prefs.getString('wf_group') ?? "").trim().toUpperCase();
+    final deanId = prefs.getString('group_id');
+    
+    final langsRaw = prefs.getString('lang_groups_json') ?? "[]";
+    final List<dynamic> myLangs = json.decode(langsRaw);
+    
+    final wfRaw = prefs.getString('wf_group_json');
+    final dynamic myWf = wfRaw != null ? json.decode(wfRaw) : null;
+
+    List<dynamic> allPlan = [];
 
     try {
-      final res = await http.get(Uri.parse('http://$serverIp:8000/plan/$id'));
-      if (res.statusCode == 200) {
-        List<dynamic> data = json.decode(res.body);
-        final filtered = data.where((item) {
-          final p = item['przedmiot'].toString().toUpperCase();
-          final t = item['typ'].toString().toUpperCase();
-          final s = item['sala'].toString().toUpperCase();
-          bool isLanguage = p.contains("LANGUAGE") || p.contains("JĘZYK") || t.contains("LEKTORAT") || p.contains("GERMAN") || p.contains("ENGLISH");
-          bool isWf = p.contains("WF ") || p.contains("WYCHOWANIE FIZYCZNE") || p.contains("AZS");
-          if (isLanguage) {
-            if (myLangCodes.isEmpty) return false;
-            return myLangCodes.any((code) => p.contains(code) || s.contains(code));
-          }
-          if (isWf) {
-            if (myWf.isEmpty) return false;
-            return p.contains(myWf) || s.contains(myWf);
-          }
-          return true;
-        }).toList();
+      // 1. Pobieramy plan dziekański i wyrzucamy lektoraty i wf
+      if (deanId != null) {
+        final resDean = await http.get(Uri.parse('http://$serverIp:8000/plan/$deanId'));
+        if (resDean.statusCode == 200) {
+          List<dynamic> deanData = json.decode(resDean.body);
+          
+          final filteredDean = deanData.where((item) {
+            final s = item['sala'].toString().toUpperCase();
+            final p = item['przedmiot'].toString().toUpperCase();
+            
+            
+            if (s.contains("WYBIERZ SWOJĄ GRUPĘ")) return false;
 
-        if (mounted) {
-          setState(() {
-            plan = groupBy(filtered, (dynamic e) => e['data']?.toString() ?? '');
-          });
+            
+            if (p.contains("WYCHOWANIE FIZYCZNE") || p.contains("WF ") || p.contains("AZS")) return false;
+            
+            return true;
+          }).toList();
+          
+          allPlan.addAll(filteredDean);
         }
+      }
+
+      // 2. Dociągamy faktyczne plany lektoratów po ID
+      for (var lang in myLangs) {
+        final resLang = await http.get(Uri.parse('http://$serverIp:8000/plan/${lang['id']}'));
+        if (resLang.statusCode == 200) {
+          allPlan.addAll(json.decode(resLang.body));
+        }
+      }
+
+      // 3. Dociągamy faktyczny plan WF-u po ID
+      if (myWf != null) {
+        final resWf = await http.get(Uri.parse('http://$serverIp:8000/plan/${myWf['id']}'));
+        if (resWf.statusCode == 200) {
+          allPlan.addAll(json.decode(resWf.body));
+        }
+      }
+
+      // 4. Grupujemy sklejony plan po dacie
+      if (mounted) {
+        setState(() {
+          plan = groupBy(allPlan, (dynamic e) => e['data']?.toString() ?? '');
+        });
       }
     } catch (e) {
       print("Błąd: $e");
     }
+    
     if (mounted) setState(() => loading = false);
   }
 
@@ -289,7 +372,6 @@ class _PlanScreenState extends State<PlanScreen> {
 
             int diffInMinutes = nextStart.difference(currentEnd).inMinutes;
 
-            // Pokazuj tylko, jeśli przerwa jest dłuższa niż 15 minut
             if (diffInMinutes > 15) {
               list.add(
                 Container(
@@ -380,7 +462,7 @@ class _PlanScreenState extends State<PlanScreen> {
             children: [
               const Icon(Icons.location_on_outlined, size: 16, color: Colors.grey),
               const SizedBox(width: 4),
-              Text("Sala: ${l['sala']}", style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.w500)),
+              Expanded(child: Text("Sala: ${l['sala']}", style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis)),
             ],
           ),
         ],
