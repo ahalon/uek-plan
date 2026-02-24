@@ -96,8 +96,16 @@ def get_plan(group_id: str):
                     "godzina": cols[1].text.strip(),
                     "przedmiot": cols[2].text.strip(),
                     "typ": cols[3].text.strip(),
-                    "sala": cols[5].text.strip()
+                    "nauczyciel": cols[4].text.strip(),
+                    "sala": cols[5].text.strip(),
+                    "uwagi": ""
                 })
+            
+            elif len(cols) == 1 and len(plan) > 0:
+                uwaga = cols[0].text.strip()
+                if uwaga:
+                    plan[-1]["uwagi"] = uwaga
+                    
         return plan
     except Exception as e:
         return {"error": str(e)}

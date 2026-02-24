@@ -77,13 +77,12 @@ class _SetupScreenState extends State<SetupScreen> {
       if (res.statusCode == 200) {
         List<dynamic> all = json.decode(res.body);
         setState(() {
-          // Filtrujemy tylko grupy dziekańskie i języki. WF z backendu nas już nie interesuje.
           deanGroups = all.where((g) => g['is_wf'] == false && g['is_lang'] == false).toList();
           langGroups = all.where((g) => g['is_lang'] == true).toList();
         });
       }
     } catch (e) {
-      print(e);
+      print("Błąd sieci: $e");
     } finally {
       if (mounted) setState(() => isLoading = false);
     }
@@ -151,20 +150,22 @@ class _SetupScreenState extends State<SetupScreen> {
       builder: (context) => Container(
         height: MediaQuery.of(context).size.height * 0.8,
         padding: const EdgeInsets.all(10),
-        child: SearchableList<dynamic>(
-          initialList: deanGroups,
-          itemBuilder: (item) => ListTile(
-            title: Text(item['name']),
-            onTap: () {
-              setState(() {
-                selectedDeanName = item['name'];
-                selectedDeanId = item['id'];
-              });
-              Navigator.pop(context);
-            },
-          ),
-          filter: (value) => deanGroups.where((e) => e['name'].toLowerCase().contains(value.toLowerCase())).toList(),
-        ),
+        child: isLoading 
+          ? const Center(child: CircularProgressIndicator()) 
+          : SearchableList<dynamic>(
+              initialList: deanGroups,
+              itemBuilder: (item) => ListTile(
+                title: Text(item['name']),
+                onTap: () {
+                  setState(() {
+                    selectedDeanName = item['name'];
+                    selectedDeanId = item['id'];
+                  });
+                  Navigator.pop(context);
+                },
+              ),
+              filter: (value) => deanGroups.where((e) => e['name'].toLowerCase().contains(value.toLowerCase())).toList(),
+            ),
       ),
     );
   }
@@ -209,7 +210,7 @@ class _SetupScreenState extends State<SetupScreen> {
 
   _showWfFormModal() {
     if (customWf != null) {
-      wfNameCtrl.text = customWf!['przedmiot'] ?? '';
+      wfNameCtrl.text = customWf!['przedmiot'].replaceAll('WF - ', '') ?? '';
       wfTimeCtrl.text = customWf!['godzina'] ?? '';
       wfRoomCtrl.text = customWf!['sala'] ?? '';
       wfTeacherCtrl.text = customWf!['nauczyciel'] ?? '';
@@ -307,11 +308,27 @@ class _PlanScreenState extends State<PlanScreen> {
 
   loadPlan() async {
     if (!mounted) return;
-    setState(() => loading = true);
-
     final prefs = await SharedPreferences.getInstance();
-    final deanId = prefs.getString('group_id');
 
+    // 1. Wczytanie z pamięci masowej dla błyskawicznego startu
+    final cachedPlan = prefs.getString('cached_plan');
+    if (cachedPlan != null) {
+      try {
+        List<dynamic> savedPlan = json.decode(cachedPlan);
+        setState(() {
+          plan = groupBy(savedPlan, (dynamic e) => e['data']?.toString() ?? '');
+          loading = false;
+        });
+      } catch (e) {
+        print("Błąd cache: $e");
+        setState(() => loading = true);
+      }
+    } else {
+      setState(() => loading = true);
+    }
+
+    // 2. Pobieranie danych z sieci w tle
+    final deanId = prefs.getString('group_id');
     final langsRaw = prefs.getString('lang_groups_json') ?? "[]";
     final List<dynamic> myLangs = json.decode(langsRaw);
 
@@ -332,7 +349,6 @@ class _PlanScreenState extends State<PlanScreen> {
             final s = item['sala'].toString().toUpperCase();
             final p = item['przedmiot'].toString().toUpperCase();
 
-            // Wypieprzamy z dziekańskiego ogólnikowe wpisy o lektoratach i wuefach
             if (s.contains("WYBIERZ SWOJĄ GRUPĘ")) return false;
             if (p.contains("WYCHOWANIE FIZYCZNE") || p.contains("WF ") || p.contains("AZS")) return false;
 
@@ -350,13 +366,17 @@ class _PlanScreenState extends State<PlanScreen> {
         }
       }
 
-      if (mounted) {
-        setState(() {
-          plan = groupBy(allPlan, (dynamic e) => e['data']?.toString() ?? '');
-        });
+      // 3. Nadpisanie pamięci i odświeżenie widoku
+      if (allPlan.isNotEmpty) {
+        await prefs.setString('cached_plan', json.encode(allPlan));
+        if (mounted) {
+          setState(() {
+            plan = groupBy(allPlan, (dynamic e) => e['data']?.toString() ?? '');
+          });
+        }
       }
     } catch (e) {
-      print("Błąd: $e");
+      print("Tryb offline, błąd pobierania w tle: $e");
     }
 
     if (mounted) setState(() => loading = false);
@@ -379,8 +399,7 @@ class _PlanScreenState extends State<PlanScreen> {
   List<Widget> _buildTimeline(List<dynamic> dayPlan) {
     List<Widget> list = [];
     List<dynamic> sortedPlan = List.from(dayPlan);
-    
-    // Zabezpieczenie na brak godziny, by aplikacja się nie sypnęła
+
     sortedPlan.sort((a, b) {
       String aStart = _cleanTime(a['godzina']?.toString().split('-')[0] ?? "00:00");
       String bStart = _cleanTime(b['godzina']?.toString().split('-')[0] ?? "00:00");
@@ -406,6 +425,8 @@ class _PlanScreenState extends State<PlanScreen> {
             int diffInMinutes = nextStart.difference(currentEnd).inMinutes;
 
             if (diffInMinutes > 15) {
+              String emoji = diffInMinutes >= 60 ? "🍔" : "☕"; // Emotka zależnie od długości przerwy
+              
               list.add(
                 Container(
                   margin: const EdgeInsets.symmetric(vertical: 12),
@@ -413,7 +434,7 @@ class _PlanScreenState extends State<PlanScreen> {
                     children: [
                       const Expanded(child: Divider(indent: 30, endIndent: 10, thickness: 0.5)),
                       Text(
-                        "Przerwa ${_formatDuration(diffInMinutes)}",
+                        "Przerwa ${_formatDuration(diffInMinutes)} $emoji",
                         style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.bold, fontSize: 13),
                       ),
                       const Expanded(child: Divider(indent: 10, endIndent: 30, thickness: 0.5)),
@@ -424,7 +445,7 @@ class _PlanScreenState extends State<PlanScreen> {
             }
           }
         } catch (e) {
-          print("Błąd czasu: $e");
+          print("Błąd obliczania czasu przerwy: $e");
         }
       }
     }
@@ -434,10 +455,8 @@ class _PlanScreenState extends State<PlanScreen> {
   @override
   Widget build(BuildContext context) {
     String key = DateFormat('yyyy-MM-dd').format(selectedDate);
-    // 1. Wyciągamy zajęcia z backendu dla danej daty
     List<dynamic> dayPlan = List.from(plan[key] ?? []);
 
-    // 2. Wstrzykujemy ręczny WF, jeśli zgadza się dzień tygodnia
     if (customWf != null && selectedDate.weekday == customWf!['day']) {
       dayPlan.add(customWf);
     }
@@ -463,7 +482,7 @@ class _PlanScreenState extends State<PlanScreen> {
             child: loading
                 ? const Center(child: CircularProgressIndicator())
                 : dayPlan.isEmpty
-                    ? const Center(child: Text("Brak zajęć"))
+                    ? const Center(child: Text("Brak zajęć na ten dzień"))
                     : ListView(
                         padding: const EdgeInsets.only(bottom: 20),
                         children: _buildTimeline(dayPlan),
@@ -475,12 +494,22 @@ class _PlanScreenState extends State<PlanScreen> {
   }
 
   Widget _card(dynamic l) {
-    bool isW = l['typ'].toString().toLowerCase().contains('wykład');
+    String typ = l['typ'].toString().toLowerCase();
+    bool isW = typ.contains('wykład');
+    bool isMoved = typ.contains('przeniesienie') || typ.contains('odwołan');
+
+    Color bgColor = const Color(0xFFFEF3C7);
+    if (isMoved) {
+      bgColor = const Color(0xFFFEE2E2); 
+    } else if (isW) {
+      bgColor = const Color(0xFFD1FAE5); 
+    }
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: isW ? const Color(0xFFD1FAE5) : const Color(0xFFFEF3C7),
+        color: bgColor,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))],
       ),
@@ -490,21 +519,20 @@ class _PlanScreenState extends State<PlanScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(l['godzina'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-              Text(l['typ'] ?? '', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blueGrey)),
+              Text(l['godzina'] ?? '', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: isMoved ? Colors.red[800] : Colors.black)),
+              Text(l['typ'] ?? '', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: isMoved ? Colors.red[800] : Colors.blueGrey)),
             ],
           ),
           const SizedBox(height: 10),
-          Text(l['przedmiot'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+          Text(l['przedmiot'] ?? '', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: isMoved ? Colors.red[900] : Colors.black)),
           
-          // Wyświetlanie nauczyciela, jeśli został dodany (WF z palca) lub backend to wypluwa
           if (l['nauczyciel'] != null && l['nauczyciel'].toString().isNotEmpty) ...[
             const SizedBox(height: 8),
             Row(
               children: [
-                const Icon(Icons.person_outline, size: 16, color: Colors.grey),
+                Icon(Icons.person_outline, size: 16, color: isMoved ? Colors.red[400] : Colors.grey),
                 const SizedBox(width: 4),
-                Expanded(child: Text(l['nauczyciel'], style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.w500))),
+                Expanded(child: Text(l['nauczyciel'], style: TextStyle(color: isMoved ? Colors.red[400] : Colors.grey, fontWeight: FontWeight.w500))),
               ],
             ),
           ],
@@ -512,11 +540,19 @@ class _PlanScreenState extends State<PlanScreen> {
           const SizedBox(height: 8),
           Row(
             children: [
-              const Icon(Icons.location_on_outlined, size: 16, color: Colors.grey),
+              Icon(Icons.location_on_outlined, size: 16, color: isMoved ? Colors.red[400] : Colors.grey),
               const SizedBox(width: 4),
-              Expanded(child: Text("Sala: ${l['sala']}", style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis)),
+              Expanded(child: Text(l['sala']?.toString().isEmpty ?? true ? "Brak sali" : "Sala: ${l['sala']}", style: TextStyle(color: isMoved ? Colors.red[400] : Colors.grey, fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis)),
             ],
           ),
+
+          if (l['uwagi'] != null && l['uwagi'].toString().isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text(
+              l['uwagi'],
+              style: const TextStyle(color: Color(0xFFD97706), fontWeight: FontWeight.bold, fontSize: 14), 
+            ),
+          ]
         ],
       ),
     );
