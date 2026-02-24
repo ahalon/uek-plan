@@ -39,6 +39,8 @@ dependencies:
   easy_date_timeline: ^2.0.9
   shared_preferences: ^2.5.4
   searchable_listview: ^2.19.4
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
 
 dev_dependencies:
   flutter_test:
