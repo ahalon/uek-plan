@@ -41,10 +41,11 @@ def get_all_groups():
         for a in soup.find_all('a', href=True):
             if 'typ=G' in a['href'] and 'grupa=' in a['href']:
                 full_cat_url = urlparse.urljoin(BASE_URL, a['href'])
-                category_links.append(full_cat_url)
+                cat_name = a.text.strip().upper() # Pobieramy nazwę kategorii
+                category_links.append((full_cat_url, cat_name))
 
         all_groups = []
-        for cat_url in category_links:
+        for cat_url, cat_name in category_links:
             cat_soup = get_soup(cat_url)
             if not cat_soup: continue
 
@@ -55,8 +56,18 @@ def get_all_groups():
                     parsed = urlparse.urlparse(full_group_url)
                     group_id = urlparse.parse_qs(parsed.query).get('id', [None])[0]
                     name = a.text.strip()
+                    
                     if group_id and name:
-                        all_groups.append({"name": name, "id": group_id})
+                        # Logika flag:
+                        is_wf = "SWFIS" in cat_name or "AZS" in cat_name
+                        is_lang = "CENTRUM JĘZYKOWE" in cat_name
+                        
+                        all_groups.append({
+                            "name": name, 
+                            "id": group_id,
+                            "is_wf": is_wf,
+                            "is_lang": is_lang
+                        })
 
         unique_groups = list({v['id']: v for v in all_groups}.values())
         return sorted(unique_groups, key=lambda x: x['name'])
