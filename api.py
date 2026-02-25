@@ -41,7 +41,7 @@ def get_all_groups():
         for a in soup.find_all('a', href=True):
             if 'typ=G' in a['href'] and 'grupa=' in a['href']:
                 full_cat_url = urlparse.urljoin(BASE_URL, a['href'])
-                cat_name = a.text.strip().upper() # Pobieramy nazwę kategorii
+                cat_name = a.text.strip().upper()
                 category_links.append((full_cat_url, cat_name))
 
         all_groups = []
@@ -58,7 +58,6 @@ def get_all_groups():
                     name = a.text.strip()
                     
                     if group_id and name:
-                        # Logika flag:
                         is_wf = "SWFIS" in cat_name or "AZS" in cat_name
                         is_lang = "CENTRUM JĘZYKOWE" in cat_name
                         
@@ -77,7 +76,7 @@ def get_all_groups():
 
 @app.get("/plan/{group_id}")
 def get_plan(group_id: str):
-    params = {'typ': 'G', 'id': group_id, 'okres': '1'}
+    params = {'typ': 'G', 'id': group_id, 'okres': '2'}
     try:
         soup = get_soup(BASE_URL, params=params)
         if not soup: return []
