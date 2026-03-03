@@ -4,8 +4,8 @@ import '../models/uek_group.dart';
 import '../models/lesson.dart';
 
 class ApiService {
-  static const String serverIp = "10.0.2.2";
-  static const String baseUrl = "http://$serverIp:8000";
+  static const String serverIp = "136.112.232.190";
+  static const String baseUrl = "https://uek-plan.onrender.com";
 
   static Future<List<UekGroup>> fetchGroups() async {
     try {

@@ -138,7 +138,7 @@ class _PlanScreenState extends State<PlanScreen> {
             int diffInMinutes = nextStart.difference(currentEnd).inMinutes;
 
             if (diffInMinutes > 15) {
-              String emoji = diffInMinutes >= 60 ? "🍔" : "☕";
+              String emoji = diffInMinutes >= 60 ?;
               list.add(
                 Container(
                   margin: const EdgeInsets.symmetric(vertical: 12),
@@ -191,16 +191,13 @@ class _PlanScreenState extends State<PlanScreen> {
             focusDate: selectedDate,
             lastDate: DateTime(2030, 12, 31),
             onDateChange: (d) => setState(() => selectedDate = d),
-            // W wersji Infinite styl nagłówka (Data/Miesiąc) bierze się z TextStyle
             showTimelineHeader: true,
             dayProps: EasyDayProps(
-              // Inactive
               inactiveDayStyle: DayStyle(
                 dayNumStyle: TextStyle(color: textColor, fontSize: 18, fontWeight: FontWeight.bold),
                 dayStrStyle: TextStyle(color: textColor),
                 monthStrStyle: TextStyle(color: textColor),
               ),
-              // Active
               activeDayStyle: DayStyle(
                 dayNumStyle: TextStyle(color: textColor, fontSize: 18, fontWeight: FontWeight.bold),
                 dayStrStyle: TextStyle(color: textColor),
