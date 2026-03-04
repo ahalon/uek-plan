@@ -1,15 +1,41 @@
-/venv
+# --- SYSTEM SPECIFIC ---
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+desktop.ini
+
+# --- PYTHON ---
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+.env
+
+# --- FLUTTER / DART ---
 .dart_tool/
+.packages
 .flutter-plugins
 .flutter-plugins-dependencies
-.packages
 .pub-cache/
 .pub/
 build/
 ios/Pods/
 ios/.symlinks/
 ios/Flutter/Generated.xcframework/
+
+# --- IDE & TOOLS ---
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+.history/
 *.log
-*.pyc
-__pycache__/
-.env
+
+# --- PROJECT SPECIFIC ---
+migrate_working_dir/
+app.*.symbols
+app.*.map.json
