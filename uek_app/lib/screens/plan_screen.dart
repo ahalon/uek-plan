@@ -67,8 +67,9 @@ class _PlanScreenState extends State<PlanScreen> {
           if (s.contains("WYBIERZ SWOJĄ GRUPĘ")) return false;
           if (p.contains("WYCHOWANIE FIZYCZNE") ||
               p.contains("WF ") ||
-              p.contains("AZS"))
+              p.contains("AZS")) {
             return false;
+          }
           return true;
         }).toList();
         allPlan.addAll(filteredDean);
