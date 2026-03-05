@@ -27,7 +27,7 @@ class _PlanScreenState extends State<PlanScreen> {
     loadPlan();
   }
 
-  loadPlan() async {
+  Future<void> loadPlan() async {
     if (!mounted) return;
     var box = Hive.box('uekBox');
 
@@ -65,7 +65,10 @@ class _PlanScreenState extends State<PlanScreen> {
           final s = item.sala.toUpperCase();
           final p = item.przedmiot.toUpperCase();
           if (s.contains("WYBIERZ SWOJĄ GRUPĘ")) return false;
-          if (p.contains("WYCHOWANIE FIZYCZNE") || p.contains("WF ") || p.contains("AZS")) return false;
+          if (p.contains("WYCHOWANIE FIZYCZNE") ||
+              p.contains("WF ") ||
+              p.contains("AZS"))
+            return false;
           return true;
         }).toList();
         allPlan.addAll(filteredDean);
@@ -88,7 +91,9 @@ class _PlanScreenState extends State<PlanScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Brak połączenia, używam danych offline"))
+          const SnackBar(
+            content: Text("Brak połączenia, używam danych offline"),
+          ),
         );
       }
     }
@@ -138,16 +143,33 @@ class _PlanScreenState extends State<PlanScreen> {
             int diffInMinutes = nextStart.difference(currentEnd).inMinutes;
 
             if (diffInMinutes > 15) {
-              String emoji = diffInMinutes >= 60 ?;
               list.add(
                 Container(
                   margin: const EdgeInsets.symmetric(vertical: 12),
                   child: Row(
                     children: [
-                      const Expanded(child: Divider(indent: 30, endIndent: 10, thickness: 0.5)),
-                      Text("Przerwa ${_formatDuration(diffInMinutes)} $emoji", 
-                        style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.bold, fontSize: 13)),
-                      const Expanded(child: Divider(indent: 10, endIndent: 30, thickness: 0.5)),
+                      const Expanded(
+                        child: Divider(
+                          indent: 30,
+                          endIndent: 10,
+                          thickness: 0.5,
+                        ),
+                      ),
+                      Text(
+                        "Przerwa ${_formatDuration(diffInMinutes)}",
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                      const Expanded(
+                        child: Divider(
+                          indent: 10,
+                          endIndent: 30,
+                          thickness: 0.5,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -174,32 +196,48 @@ class _PlanScreenState extends State<PlanScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Plan UEK"), 
+        title: const Text("Plan UEK"),
         actions: [
           IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () {
               if (!mounted) return;
-              Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const SetupScreen()));
-            })
-        ]
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (c) => const SetupScreen()),
+              );
+            },
+          ),
+        ],
       ),
       body: Column(
         children: [
           EasyInfiniteDateTimeLine(
-            firstDate: DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day), 
+            firstDate: DateTime(
+              DateTime.now().year,
+              DateTime.now().month,
+              DateTime.now().day,
+            ),
             focusDate: selectedDate,
             lastDate: DateTime(2030, 12, 31),
             onDateChange: (d) => setState(() => selectedDate = d),
             showTimelineHeader: true,
             dayProps: EasyDayProps(
               inactiveDayStyle: DayStyle(
-                dayNumStyle: TextStyle(color: textColor, fontSize: 18, fontWeight: FontWeight.bold),
+                dayNumStyle: TextStyle(
+                  color: textColor,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
                 dayStrStyle: TextStyle(color: textColor),
                 monthStrStyle: TextStyle(color: textColor),
               ),
               activeDayStyle: DayStyle(
-                dayNumStyle: TextStyle(color: textColor, fontSize: 18, fontWeight: FontWeight.bold),
+                dayNumStyle: TextStyle(
+                  color: textColor,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
                 dayStrStyle: TextStyle(color: textColor),
                 monthStrStyle: TextStyle(color: textColor),
                 decoration: BoxDecoration(
@@ -207,13 +245,19 @@ class _PlanScreenState extends State<PlanScreen> {
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    colors: [isDark ? Colors.white24 : Colors.black12, isDark ? Colors.white10 : Colors.black26],
+                    colors: [
+                      isDark ? Colors.white24 : Colors.black12,
+                      isDark ? Colors.white10 : Colors.black26,
+                    ],
                   ),
                 ),
               ),
-              // Today
               todayStyle: DayStyle(
-                dayNumStyle: TextStyle(color: textColor, fontSize: 18, fontWeight: FontWeight.bold),
+                dayNumStyle: TextStyle(
+                  color: textColor,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
                 dayStrStyle: TextStyle(color: textColor),
                 monthStrStyle: TextStyle(color: textColor),
               ),
@@ -230,8 +274,16 @@ class _PlanScreenState extends State<PlanScreen> {
                         ? ListView(
                             physics: const AlwaysScrollableScrollPhysics(),
                             children: [
-                              SizedBox(height: MediaQuery.of(context).size.height * 0.3),
-                              Center(child: Text("Brak zajęć na ten dzień", style: TextStyle(color: textColor))),
+                              SizedBox(
+                                height:
+                                    MediaQuery.of(context).size.height * 0.3,
+                              ),
+                              Center(
+                                child: Text(
+                                  "Brak zajęć na ten dzień",
+                                  style: TextStyle(color: textColor),
+                                ),
+                              ),
                             ],
                           )
                         : ListView(

@@ -34,7 +34,7 @@ class _SetupScreenState extends State<SetupScreen> {
     _fetchGroups();
   }
 
-  _fetchGroups() async {
+  Future<void> _fetchGroups() async {
     setState(() => isLoading = true);
     try {
       final all = await ApiService.fetchGroups();
@@ -78,7 +78,7 @@ class _SetupScreenState extends State<SetupScreen> {
     }
   }
 
-  _save() async {
+  Future<void> _save() async {
     if (selectedDean == null) return;
 
     var box = Hive.box('uekBox');
@@ -194,7 +194,7 @@ class _SetupScreenState extends State<SetupScreen> {
     );
   }
 
-  _showDeanPicker() {
+  void _showDeanPicker() {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -231,7 +231,7 @@ class _SetupScreenState extends State<SetupScreen> {
     );
   }
 
-  _showLangPicker() {
+  void _showLangPicker() {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -279,7 +279,7 @@ class _SetupScreenState extends State<SetupScreen> {
     );
   }
 
-  _showWfFormModal() {
+  void _showWfFormModal() {
     if (customWf != null) {
       wfNameCtrl.text = customWf!['przedmiot'].replaceAll('WF - ', '') ?? '';
       wfTimeCtrl.text = customWf!['godzina'] ?? '';
@@ -306,7 +306,7 @@ class _SetupScreenState extends State<SetupScreen> {
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                 const SizedBox(height: 15),
                 DropdownButtonFormField<int>(
-                  value: wfDay,
+                  initialValue: wfDay,
                   decoration: const InputDecoration(
                       labelText: "Dzień tygodnia", border: OutlineInputBorder()),
                   items: const [
