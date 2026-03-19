@@ -28,7 +28,7 @@ The project implements a middleware server (Backend) that authenticates with the
 
 1. **Clone the repository:**
    ```bash
-   git clone [https://github.com/YOUR-USERNAME/uek-plan.git](https://github.com/YOUR-USERNAME/uek-plan.git)
+   git clone [https://github.com/YOUR-USERNAME/uek-plan.git](https://github.com/ahalon/uek-plan.git)
    cd uek-plan
 2. **Create a virtual environment:**
 
