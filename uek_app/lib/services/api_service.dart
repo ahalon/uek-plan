@@ -5,7 +5,10 @@ import '../models/lesson.dart';
 
 class ApiService {
   static const String serverIp = "136.112.232.190";
-  static const String baseUrl = "https://uek-plan.onrender.com";
+  static const String baseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'https://uek-plan.onrender.com',
+  );
 
   static String _extractApiError(http.Response res) {
     try {

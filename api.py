@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 import requests
 from bs4 import BeautifulSoup
 import urllib.parse as urlparse
@@ -10,6 +11,28 @@ load_dotenv()
 
 # initializes FastApi instance
 app = FastAPI()
+
+# Comma-separated list of origins allowed for browser clients (e.g. GitHub Pages).
+allowed_origins_env = os.getenv("ALLOWED_ORIGINS", "")
+if allowed_origins_env.strip():
+    ALLOWED_ORIGINS = [origin.strip() for origin in allowed_origins_env.split(",") if origin.strip()]
+else:
+    ALLOWED_ORIGINS = [
+        "https://ahalon.github.io",
+        "http://localhost",
+        "http://localhost:3000",
+        "http://localhost:5000",
+        "http://localhost:8000",
+        "http://127.0.0.1:5500",
+    ]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=False,
+    allow_methods=["GET", "OPTIONS"],
+    allow_headers=["*"],
+)
 
 # Fetches data from .env
 UEK_LOGIN = os.getenv("UEK_LOGIN")
@@ -27,6 +50,11 @@ HEADERS = {
     # Informs the sever about the preferred language for the response
     'Accept-Language': 'pl-PL,pl;q=0.9,en-US;q=0.8,en;q=0.7',
 }
+
+
+@app.get("/")
+def root():
+    return {"status": "ok"}
 
 def get_soup(url, params=None):
     """

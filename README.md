@@ -56,5 +56,40 @@ The project implements a middleware server (Backend) that authenticates with the
 ## 🔐 Security & Privacy
 Just like the official university website, access to the data through this app is restricted. Only students with valid UEK credentials (index number and password) can fetch the schedule. Authentication credentials (login/password) are handled strictly as environment variables and are never committed to the repository. The API acts as a secure tunnel and does not store any private user data.
 
+## 🌐 Flutter Web on GitHub Pages
+
+To run the web app from GitHub Pages, keep the API on Render and deploy only the Flutter web build.
+
+1. Build web with proper base path (repository name):
+
+    ```bash
+    cd uek_app
+    flutter build web \
+      --release \
+      --base-href /uek-plan/ \
+      --dart-define=API_BASE_URL=https://uek-plan.onrender.com
+    ```
+
+2. Publish the content of `uek_app/build/web` to GitHub Pages.
+
+3. Ensure backend CORS allows your Pages origin.
+
+    On Render add environment variable:
+
+    ```env
+    ALLOWED_ORIGINS=https://ahalon.github.io,http://localhost:3000,http://localhost:5000
+    ```
+
+4. Keep backend credentials configured on Render:
+
+    ```env
+    UEK_LOGIN=your_student_id
+    UEK_HASLO=your_password
+    ```
+
+Notes:
+- GitHub Pages origin is `https://<username>.github.io` (without repository path).
+- If you rename the repository, update `--base-href /<repo-name>/`.
+
 ## 📝 Author
 **Adam Haloń** - Computer Science Student at the Cracow University of Economics.
