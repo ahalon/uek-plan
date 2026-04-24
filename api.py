@@ -137,13 +137,16 @@ def get_all_groups():
                 params = urlparse.parse_qs(parsed.query)
                 group_id = params.get('id', [None])[0]
                 name = a.text.strip()
+                normalized_name = name.upper().strip()
 
                 if group_id and name:
                     all_groups.append({
                         "name": name,
                         "id": group_id,
                         "is_wf": "WF" in name.upper() or "AZS" in name.upper(),
-                        "is_lang": "LEKTORAT" in name.upper() or "JĘZYK" in name.upper()
+                        "is_lang": normalized_name.startswith("CJ")
+                        or "LEKTORAT" in normalized_name
+                        or "JĘZYK" in normalized_name,
                     })
 
         if not any(soups):

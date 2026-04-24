@@ -4,6 +4,7 @@ import 'package:collection/collection.dart';
 import 'package:easy_date_timeline/easy_date_timeline.dart';
 import 'package:intl/intl.dart';
 import 'package:uek_app/models/lesson.dart';
+import 'package:uek_app/models/uek_group.dart';
 import 'package:uek_app/services/api_service.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:uek_app/widgets/lesson_card.dart';
@@ -18,6 +19,8 @@ class PlanScreen extends StatefulWidget {
 class _PlanScreenState extends State<PlanScreen> {
   Map<String, List<Lesson>> plan = {};
   Lesson? customWf;
+  UekGroup? selectedDean;
+  List<UekGroup> selectedLangs = [];
   DateTime selectedDate = DateTime.now();
   bool loading = false;
 
@@ -56,6 +59,19 @@ class _PlanScreenState extends State<PlanScreen> {
       if (customWfRaw != null) {
         customWf = Lesson.fromJson(json.decode(customWfRaw));
       }
+
+      final selectedDeanRaw = box.get('selected_dean_json');
+      if (selectedDeanRaw != null) {
+        try {
+          selectedDean = UekGroup.fromJson(json.decode(selectedDeanRaw));
+        } catch (_) {}
+      }
+
+      final selectedLangsRaw = box.get('lang_groups_json') ?? "[]";
+      try {
+        final List<dynamic> langsJson = json.decode(selectedLangsRaw);
+        selectedLangs = langsJson.map((e) => UekGroup.fromJson(e)).toList();
+      } catch (_) {}
 
       List<Lesson> allPlan = [];
 
@@ -100,6 +116,40 @@ class _PlanScreenState extends State<PlanScreen> {
     }
 
     if (mounted) setState(() => loading = false);
+  }
+
+  Widget _buildSelectionSummary() {
+    final deanText = selectedDean?.name ?? "Brak grupy dziekańskiej";
+    final langText = selectedLangs.isEmpty
+        ? "Brak lektoratów"
+        : selectedLangs.map((e) => e.name).join(', ');
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "Wybrana grupa dziekańska",
+                style: Theme.of(context).textTheme.labelLarge,
+              ),
+              const SizedBox(height: 4),
+              Text(deanText),
+              const SizedBox(height: 12),
+              Text(
+                "Wybrane lektoraty",
+                style: Theme.of(context).textTheme.labelLarge,
+              ),
+              const SizedBox(height: 4),
+              Text(langText),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   String _cleanTime(String time) {
@@ -213,6 +263,7 @@ class _PlanScreenState extends State<PlanScreen> {
       ),
       body: Column(
         children: [
+          _buildSelectionSummary(),
           EasyInfiniteDateTimeLine(
             firstDate: DateTime(
               DateTime.now().year,

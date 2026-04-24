@@ -97,6 +97,7 @@ class _SetupScreenState extends State<SetupScreen> {
     var box = Hive.box('uekBox');
 
     await box.put('group_id', selectedDean!.id);
+    await box.put('selected_dean_json', json.encode(selectedDean!.toJson()));
 
     final langsJson = selectedLangs.map((e) => e.toJson()).toList();
     await box.put('lang_groups_json', json.encode(langsJson));
@@ -154,8 +155,12 @@ class _SetupScreenState extends State<SetupScreen> {
             ListTile(
               title: Text(
                 selectedLangs.isEmpty
-                    ? "Wybierz lektoraty"
-                    : "Wybrane: ${selectedLangs.map((e) => e.name).join(', ')}",
+                    ? "Wybierz 2 lektoraty"
+                    : "Lektoraty: ${selectedLangs.map((e) => e.name).join(', ')}",
+              ),
+              subtitle: Text(
+                "Wybrano ${selectedLangs.length}/2",
+                style: TextStyle(color: Theme.of(context).hintColor),
               ),
               tileColor: tileBg,
               trailing: const Icon(Icons.language),
@@ -310,8 +315,18 @@ class _SetupScreenState extends State<SetupScreen> {
                     const Padding(
                       padding: EdgeInsets.all(10),
                       child: Text(
-                        "Wybierz lektoraty",
+                        "Wybierz 2 lektoraty",
                         style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text(
+                        "Wybrano ${selectedLangs.length}/2",
+                        style: TextStyle(
+                          color: Theme.of(context).hintColor,
+                          fontSize: 12,
+                        ),
                       ),
                     ),
                     Expanded(
@@ -323,7 +338,23 @@ class _SetupScreenState extends State<SetupScreen> {
                           onChanged: (val) {
                             setModalState(() {
                               if (val == true) {
-                                selectedLangs.add(item);
+                                final alreadySelected = selectedLangs.any(
+                                  (e) => e.id == item.id,
+                                );
+                                if (!alreadySelected &&
+                                    selectedLangs.length >= 2) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        "Możesz wybrać maksymalnie 2 lektoraty.",
+                                      ),
+                                    ),
+                                  );
+                                  return;
+                                }
+                                if (!alreadySelected) {
+                                  selectedLangs.add(item);
+                                }
                               } else {
                                 selectedLangs.removeWhere(
                                   (e) => e.id == item.id,
