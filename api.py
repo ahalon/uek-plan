@@ -40,6 +40,12 @@ def get_soup(url, params=None):
         BeautifulSoup: A parsed object if successful, None if an error occurs.
     """
     try:
+        if not UEK_LOGIN or not UEK_HASLO:
+            raise HTTPException(
+                status_code=500,
+                detail="Brak konfiguracji UEK_LOGIN/UEK_HASLO w zmiennych środowiskowych"
+            )
+
         auth = (UEK_LOGIN, UEK_HASLO) if UEK_LOGIN and UEK_HASLO else None
         # Execute the GET request with custom headers and a 10-second safety timeout
         response = requests.get(
@@ -53,14 +59,23 @@ def get_soup(url, params=None):
         response.encoding = 'utf-8'
         
         #Check if the server responded succesfully
+        if response.status_code == 401:
+            raise HTTPException(
+                status_code=502,
+                detail="UEK odrzucil autoryzacje (401). Sprawdz UEK_LOGIN i UEK_HASLO."
+            )
         if response.status_code != 200:
-            print(f"BŁĄD HTTP: {response.status_code} dla {url}")
-            return None
+            raise HTTPException(
+                status_code=503,
+                detail=f"UEK zwrocil nieoczekiwany status HTTP {response.status_code}."
+            )
 
         # BeautifulSoup transforms raw HTML into a navigable object (DOM Tree),
         # allowing us to search for specific tags and extract their data.   
         return BeautifulSoup(response.text, 'lxml')
     # Error handle
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Błąd połączenia: {e}")
         return None
