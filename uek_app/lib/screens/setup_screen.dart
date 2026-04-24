@@ -21,6 +21,8 @@ class _SetupScreenState extends State<SetupScreen> {
   Map<String, dynamic>? customWf;
 
   bool isLoading = false;
+  bool groupsSynced = false;
+  String? groupsError;
 
   final wfNameCtrl = TextEditingController();
   final wfTimeCtrl = TextEditingController();
@@ -35,12 +37,16 @@ class _SetupScreenState extends State<SetupScreen> {
   }
 
   Future<void> _fetchGroups() async {
-    setState(() => isLoading = true);
+    setState(() {
+      isLoading = true;
+      groupsError = null;
+    });
     try {
       final all = await ApiService.fetchGroups();
       setState(() {
         deanGroups = all.where((g) => !g.isWf && !g.isLang).toList();
         langGroups = all.where((g) => g.isLang).toList();
+        groupsSynced = true;
       });
 
       var box = Hive.box('uekBox');
@@ -56,10 +62,12 @@ class _SetupScreenState extends State<SetupScreen> {
       if (langsRaw != null) {
         try {
           List<dynamic> decodedLangs = json.decode(langsRaw);
-          List<String> savedLangIds =
-              decodedLangs.map((e) => e['id'].toString()).toList();
-          selectedLangs =
-              langGroups.where((g) => savedLangIds.contains(g.id)).toList();
+          List<String> savedLangIds = decodedLangs
+              .map((e) => e['id'].toString())
+              .toList();
+          selectedLangs = langGroups
+              .where((g) => savedLangIds.contains(g.id))
+              .toList();
         } catch (_) {}
       }
 
@@ -70,9 +78,14 @@ class _SetupScreenState extends State<SetupScreen> {
         } catch (_) {}
       }
     } catch (e) {
+      setState(() {
+        groupsSynced = false;
+        groupsError = e.toString();
+      });
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString()), backgroundColor: Colors.red));
+        SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
+      );
     } finally {
       if (mounted) setState(() => isLoading = false);
     }
@@ -96,7 +109,8 @@ class _SetupScreenState extends State<SetupScreen> {
 
     if (!mounted) return;
     Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const PlanScreen()));
+      MaterialPageRoute(builder: (context) => const PlanScreen()),
+    );
   }
 
   @override
@@ -109,8 +123,9 @@ class _SetupScreenState extends State<SetupScreen> {
         title: const Text("Konfiguracja"),
         actions: [
           ValueListenableBuilder(
-            valueListenable:
-                Hive.box('uekBox').listenable(keys: ['is_dark_mode']),
+            valueListenable: Hive.box(
+              'uekBox',
+            ).listenable(keys: ['is_dark_mode']),
             builder: (context, Box box, _) {
               return PopupMenuButton<bool>(
                 icon: const Icon(Icons.dark_mode),
@@ -137,18 +152,22 @@ class _SetupScreenState extends State<SetupScreen> {
             ),
             const SizedBox(height: 15),
             ListTile(
-              title: Text(selectedLangs.isEmpty
-                  ? "Wybierz lektoraty"
-                  : "Wybrane: ${selectedLangs.map((e) => e.name).join(', ')}"),
+              title: Text(
+                selectedLangs.isEmpty
+                    ? "Wybierz lektoraty"
+                    : "Wybrane: ${selectedLangs.map((e) => e.name).join(', ')}",
+              ),
               tileColor: tileBg,
               trailing: const Icon(Icons.language),
               onTap: () => _showLangPicker(),
             ),
             const SizedBox(height: 15),
             ListTile(
-              title: Text(customWf != null
-                  ? "WF: ${customWf!['przedmiot']} (${customWf!['godzina']})"
-                  : "Skonfiguruj WF ręcznie"),
+              title: Text(
+                customWf != null
+                    ? "WF: ${customWf!['przedmiot']} (${customWf!['godzina']})"
+                    : "Skonfiguruj WF ręcznie",
+              ),
               tileColor: tileBg,
               trailing: const Icon(Icons.sports_basketball),
               onTap: () => _showWfFormModal(),
@@ -163,7 +182,8 @@ class _SetupScreenState extends State<SetupScreen> {
                   ? const SizedBox(
                       width: 20,
                       height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2))
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
                   : const Text("Zapisz i przejdź do planu"),
             ),
             const SizedBox(height: 12),
@@ -171,18 +191,32 @@ class _SetupScreenState extends State<SetupScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(
-                  isLoading ? Icons.sync : Icons.check_circle_outline,
+                  isLoading
+                      ? Icons.sync
+                      : groupsSynced
+                      ? Icons.check_circle_outline
+                      : Icons.error_outline,
                   size: 14,
-                  color: isLoading ? Colors.orange : Colors.green,
+                  color: isLoading
+                      ? Colors.orange
+                      : groupsSynced
+                      ? Colors.green
+                      : Colors.red,
                 ),
                 const SizedBox(width: 5),
                 Text(
                   isLoading
                       ? "Aktualizacja bazy grup..."
-                      : "Baza grup zsynchronizowana",
+                      : groupsSynced
+                      ? "Baza grup zsynchronizowana"
+                      : "Nie udało się zsynchronizować grup",
                   style: TextStyle(
                     fontSize: 12,
-                    color: isLoading ? Colors.orange : Colors.green,
+                    color: isLoading
+                        ? Colors.orange
+                        : groupsSynced
+                        ? Colors.green
+                        : Colors.red,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -202,17 +236,46 @@ class _SetupScreenState extends State<SetupScreen> {
         height: MediaQuery.of(context).size.height * 0.8,
         padding: const EdgeInsets.all(10),
         child: deanGroups.isEmpty
-            ? const Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(),
-                  SizedBox(height: 20),
-                  Text("Pobieranie grup z serwera UEK...",
-                      style: TextStyle(fontWeight: FontWeight.bold)),
-                  Text("Może to potrwać do 20 sekund.",
-                      style: TextStyle(color: Colors.grey, fontSize: 12)),
-                ],
-              )
+            ? (isLoading
+                  ? const Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CircularProgressIndicator(),
+                        SizedBox(height: 20),
+                        Text(
+                          "Pobieranie grup z serwera UEK...",
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          "Może to potrwać do 20 sekund.",
+                          style: TextStyle(color: Colors.grey, fontSize: 12),
+                        ),
+                      ],
+                    )
+                  : (groupsError != null)
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(
+                            Icons.error_outline,
+                            color: Colors.red,
+                            size: 28,
+                          ),
+                          const SizedBox(height: 10),
+                          const Text("Nie udało się pobrać grup"),
+                          const SizedBox(height: 8),
+                          ElevatedButton(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              _fetchGroups();
+                            },
+                            child: const Text("Spróbuj ponownie"),
+                          ),
+                        ],
+                      ),
+                    )
+                  : const Center(child: Text("Brak grup do wyświetlenia")))
             : SearchableList<UekGroup>(
                 initialList: deanGroups,
                 itemBuilder: (item) => ListTile(
@@ -223,8 +286,9 @@ class _SetupScreenState extends State<SetupScreen> {
                   },
                 ),
                 filter: (value) => deanGroups
-                    .where((e) =>
-                        e.name.toLowerCase().contains(value.toLowerCase()))
+                    .where(
+                      (e) => e.name.toLowerCase().contains(value.toLowerCase()),
+                    )
                     .toList(),
               ),
       ),
@@ -244,9 +308,12 @@ class _SetupScreenState extends State<SetupScreen> {
               : Column(
                   children: [
                     const Padding(
-                        padding: EdgeInsets.all(10),
-                        child: Text("Wybierz lektoraty",
-                            style: TextStyle(fontWeight: FontWeight.bold))),
+                      padding: EdgeInsets.all(10),
+                      child: Text(
+                        "Wybierz lektoraty",
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
                     Expanded(
                       child: SearchableList<UekGroup>(
                         initialList: langGroups,
@@ -258,17 +325,20 @@ class _SetupScreenState extends State<SetupScreen> {
                               if (val == true) {
                                 selectedLangs.add(item);
                               } else {
-                                selectedLangs
-                                    .removeWhere((e) => e.id == item.id);
+                                selectedLangs.removeWhere(
+                                  (e) => e.id == item.id,
+                                );
                               }
                             });
                             setState(() {});
                           },
                         ),
                         filter: (value) => langGroups
-                            .where((e) => e.name
-                                .toLowerCase()
-                                .contains(value.toLowerCase()))
+                            .where(
+                              (e) => e.name.toLowerCase().contains(
+                                value.toLowerCase(),
+                              ),
+                            )
                             .toList(),
                       ),
                     ),
@@ -294,21 +364,26 @@ class _SetupScreenState extends State<SetupScreen> {
       builder: (context) => StatefulBuilder(
         builder: (context, setModalState) => Padding(
           padding: EdgeInsets.only(
-              bottom: MediaQuery.of(context).viewInsets.bottom,
-              left: 20,
-              right: 20,
-              top: 20),
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+            left: 20,
+            right: 20,
+            top: 20,
+          ),
           child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text("Ręczny wpis WF",
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                const Text(
+                  "Ręczny wpis WF",
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                ),
                 const SizedBox(height: 15),
                 DropdownButtonFormField<int>(
                   initialValue: wfDay,
                   decoration: const InputDecoration(
-                      labelText: "Dzień tygodnia", border: OutlineInputBorder()),
+                    labelText: "Dzień tygodnia",
+                    border: OutlineInputBorder(),
+                  ),
                   items: const [
                     DropdownMenuItem(value: 1, child: Text("Poniedziałek")),
                     DropdownMenuItem(value: 2, child: Text("Wtorek")),
@@ -320,27 +395,36 @@ class _SetupScreenState extends State<SetupScreen> {
                 ),
                 const SizedBox(height: 10),
                 TextField(
-                    controller: wfTimeCtrl,
-                    decoration: const InputDecoration(
-                        labelText: "Godziny (np. 11:30 - 13:00)",
-                        border: OutlineInputBorder())),
+                  controller: wfTimeCtrl,
+                  decoration: const InputDecoration(
+                    labelText: "Godziny (np. 11:30 - 13:00)",
+                    border: OutlineInputBorder(),
+                  ),
+                ),
                 const SizedBox(height: 10),
                 TextField(
-                    controller: wfNameCtrl,
-                    decoration: const InputDecoration(
-                        labelText: "Nazwa (np. Basen, Koszykówka)",
-                        border: OutlineInputBorder())),
+                  controller: wfNameCtrl,
+                  decoration: const InputDecoration(
+                    labelText: "Nazwa (np. Basen, Koszykówka)",
+                    border: OutlineInputBorder(),
+                  ),
+                ),
                 const SizedBox(height: 10),
                 TextField(
-                    controller: wfRoomCtrl,
-                    decoration: const InputDecoration(
-                        labelText: "Sala (np. Hala)",
-                        border: OutlineInputBorder())),
+                  controller: wfRoomCtrl,
+                  decoration: const InputDecoration(
+                    labelText: "Sala (np. Hala)",
+                    border: OutlineInputBorder(),
+                  ),
+                ),
                 const SizedBox(height: 10),
                 TextField(
-                    controller: wfTeacherCtrl,
-                    decoration: const InputDecoration(
-                        labelText: "Nauczyciel", border: OutlineInputBorder())),
+                  controller: wfTeacherCtrl,
+                  decoration: const InputDecoration(
+                    labelText: "Nauczyciel",
+                    border: OutlineInputBorder(),
+                  ),
+                ),
                 const SizedBox(height: 20),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -350,8 +434,10 @@ class _SetupScreenState extends State<SetupScreen> {
                         setState(() => customWf = null);
                         Navigator.pop(context);
                       },
-                      child: const Text("Usuń WF",
-                          style: TextStyle(color: Colors.red)),
+                      child: const Text(
+                        "Usuń WF",
+                        style: TextStyle(color: Colors.red),
+                      ),
                     ),
                     ElevatedButton(
                       onPressed: () {
