@@ -86,33 +86,41 @@ def get_all_groups():
     Scrapes the university portal to retrieve and categorize all student groups.
     """
     try:
-        # Fetch the parsed HTML 'soup' from the base schedule URL
-        soup = get_soup(BASE_URL)
-        if not soup:
-            # Raise service unavailable error if the university server doesn't respond
-            raise HTTPException(status_code=503, detail="Nie można połączyć się z serwerem UEK")
+        # Some UEK layouts expose groups only for selected query params,
+        # so parse both the default page and typ=G variant.
+        soups = [get_soup(BASE_URL), get_soup(BASE_URL, params={'typ': 'G'})]
 
         all_groups = []
-        # Iterate through all hyperlinks to find group-specific data
-        for a in soup.find_all('a', href=True):
-            href = a['href']
-            
-            # Filter for links containing both an ID and the 'Group' type parameter
-            if 'id=' in href and 'typ=G' in href:
-                # Parse the query string to safely extract the 'id' value
+        for soup in soups:
+            if not soup:
+                continue
+
+            # Iterate through all hyperlinks to find group-specific data
+            for a in soup.find_all('a', href=True):
+                href = a['href']
+                href_lower = href.lower()
+
+                # Match group links case-insensitively, because UEK sometimes changes casing.
+                if 'id=' not in href_lower or 'typ=g' not in href_lower:
+                    continue
+
+                # Parse the query string to safely extract id/name.
                 parsed = urlparse.urlparse(href)
                 params = urlparse.parse_qs(parsed.query)
                 group_id = params.get('id', [None])[0]
                 name = a.text.strip()
-                
+
                 if group_id and name:
-                    # Append group data with boolean flags for PE and Language courses
                     all_groups.append({
-                        "name": name, 
+                        "name": name,
                         "id": group_id,
                         "is_wf": "WF" in name.upper() or "AZS" in name.upper(),
                         "is_lang": "LEKTORAT" in name.upper() or "JĘZYK" in name.upper()
                     })
+
+        if not any(soups):
+            # Raise service unavailable error if the university server doesn't respond
+            raise HTTPException(status_code=503, detail="Nie można połączyć się z serwerem UEK")
 
         if not all_groups:
             # Fallback error if the scraper finds no groups (potential block or layout change)
