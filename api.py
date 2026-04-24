@@ -40,11 +40,13 @@ def get_soup(url, params=None):
         BeautifulSoup: A parsed object if successful, None if an error occurs.
     """
     try:
+        auth = (UEK_LOGIN, UEK_HASLO) if UEK_LOGIN and UEK_HASLO else None
         # Execute the GET request with custom headers and a 10-second safety timeout
         response = requests.get(
             url, 
             params=params, 
             headers=HEADERS, 
+            auth=auth,
             timeout=10
         )
         # Force utf-8 to handle polish characters
@@ -99,12 +101,14 @@ def get_all_groups():
 
         if not all_groups:
             # Fallback error if the scraper finds no groups (potential block or layout change)
-            return {"status": "error", "message": "Nie znaleziono grup. Serwer UEK może blokować scraper."}
+            raise HTTPException(status_code=503, detail="Nie znaleziono grup. Serwer UEK może blokować scraper.")
 
         # Remove duplicates using a dictionary comprehension and sort the list alphabetically
         unique_groups = list({v['id']: v for v in all_groups}.values())
         return sorted(unique_groups, key=lambda x: x['name'])
 
+    except HTTPException:
+        raise
     except Exception as e:
         # Global catch-all for server-side errors
         raise HTTPException(status_code=500, detail=f"Błąd serwera: {str(e)}")
@@ -154,9 +158,11 @@ def get_plan(group_id: str):
                     plan[-1]["uwagi"] = uwaga
                     
         return plan
+    except HTTPException:
+        raise
     except Exception as e:
-        # Catch and return any runtime or connection errors
-        return {"error": str(e)}
+        # Catch and return runtime errors as proper HTTP responses
+        raise HTTPException(status_code=500, detail=f"Błąd serwera: {str(e)}")
 
 
 # Entry point: Starts the Uvicorn ASGI server on all network interfaces (0.0.0.0) 
