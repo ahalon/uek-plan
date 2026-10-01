@@ -173,7 +173,7 @@ def get_plan(group_id: str):
     Fetches and parses the detailed schedule for a specific group ID.
     """
     # Define request parameters: Group type, unique ID, and time period
-    params = {'typ': 'G', 'id': group_id, 'okres': '2'}
+    params = {'typ': 'G', 'id': group_id, 'okres': '3'}
     try:
         # Fetch the parsed HTML from the university server
         soup = get_soup(BASE_URL, params=params)
